@@ -21,6 +21,9 @@ const addressRoutes = require('./routes/users/addressRoutes');
 const orderRoutes = require('./routes/order/orderRoutes');
 const deliveryRoutes = require('./routes/routes/deliveryAreaRoutes');
 const appVersionRoutes = require('./routes/app/appVersion');
+const ticketRoutes = require('./routes/support/ticketRoutes');
+const policyRoutes = require('./routes/support/policyRoutes');
+const notificationRoutes = require('./routes/notifications/notificationRoutes');
 // Middleware
 app.use(helmet());
 
@@ -57,6 +60,9 @@ app.use('/api/address', addressRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/delivery-areas', deliveryRoutes);
 app.use('/api/app-version', appVersionRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/policies', policyRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Basic routes
 app.get('/', (req, res) => {
