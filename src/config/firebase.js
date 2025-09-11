@@ -1,6 +1,5 @@
 const admin = require('firebase-admin');
-// Adjust the path to where you saved the JSON file
-const serviceAccount = require('../services/notificaiton/ksdeliveryboy-16bec-firebase-adminsdk.json');
+require('dotenv').config();
 
 let isInitialized = false;
 
@@ -10,6 +9,14 @@ const initializeFirebase = () => {
       console.log('✅ Firebase already initialized');
       return;
     }
+
+    // Build credentials object from environment variables
+    const serviceAccount = {
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // important!
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    };
 
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
@@ -58,5 +65,5 @@ module.exports = {
   getAuth,
   getStorage,
   getMessaging,
-  admin
+  admin,
 };
