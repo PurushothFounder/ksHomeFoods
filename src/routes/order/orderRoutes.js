@@ -19,7 +19,7 @@ router.get('/my-orders', authenticateToken, OrderController.getUserOrders);
 router.get('/:orderId', authenticateToken, OrderController.getOrder);
 
 // Cancel order
-router.patch('/:orderId/cancel', authenticateToken, OrderController.cancelOrder);
+router.put('/:orderId/cancel', authenticateToken, OrderController.cancelOrder);
 
 // =============================================================================
 // ADMIN ROUTES (require admin authentication)

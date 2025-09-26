@@ -6,7 +6,7 @@ const morgan = require('morgan');
 const { initializeFirebase } = require('./config/firebase');
 
 const app = express();
-
+console.log("Private Key Preview:", JSON.stringify(process.env.FIREBASE_PRIVATE_KEY.slice(0, 100)));
 // Initialize Firebase
 initializeFirebase();
 
@@ -24,25 +24,15 @@ const appVersionRoutes = require('./routes/app/appVersion');
 const ticketRoutes = require('./routes/support/ticketRoutes');
 const policyRoutes = require('./routes/support/policyRoutes');
 const notificationRoutes = require('./routes/notifications/notificationRoutes');
+const deliveryBoyRoutes = require('./routes/deliveryboy/deliveryboyRoutes');
 // Middleware
 app.use(helmet());
 
-// Updated CORS configuration to allow multiple origins
+// Apply a more permissive CORS configuration globally to handle all cases
 app.use(cors({
-  origin: [
-    'http://localhost:3000',    // Default Flutter web port
-    'http://localhost:8080',   // Your current Flutter web port
-    'http://localhost:8080',    // Alternative Flutter web port
-    'http://127.0.0.1:3000',    // Alternative localhost
-    'http://127.0.0.1:61154',   // Alternative localhost for your port
-    'http://127.0.0.1:8080',    // Alternative localhost
-    process.env.FRONTEND_URL    // Environment variable fallback
-  ].filter(Boolean), // Remove any undefined values
-  credentials: true,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  preflightContinue: false,
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 app.use(morgan('combined'));
@@ -63,6 +53,7 @@ app.use('/api/app-version', appVersionRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/delivery-boy', deliveryBoyRoutes);
 
 // Basic routes
 app.get('/', (req, res) => {
