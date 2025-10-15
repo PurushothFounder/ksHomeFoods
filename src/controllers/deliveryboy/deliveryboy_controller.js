@@ -1,5 +1,6 @@
+const Order = require('../../models/order/orderModel');
 const DeliveryBoyService = require('../../services/deliveryboy/deliveryboyService');
-
+const OrderService = require('../../services/order/orderService');
 class DeliveryBoyController {
   /**
    * @desc Handles the login and registration flow for a delivery boy.
@@ -9,11 +10,11 @@ class DeliveryBoyController {
    */
   async loginOrRegister(req, res) {
     try {
-      const { uid, email, displayName, phoneNumber } = req.user; // from auth middleware
+      const { uid, email, displayName } = req.user; // from auth middleware
 
-      console.log('📝 Attempting login/registration for delivery boy:', email);
+      console.log('📝 Attempting login/registration for delivery boy email:', email);
 
-      const deliveryBoyData = { uid, email, displayName, phoneNumber };
+      const deliveryBoyData = { uid, email, displayName };
       const result = await DeliveryBoyService.loginOrRegister(deliveryBoyData);
 
       if (!result.exists) {
@@ -93,6 +94,77 @@ async registerDetails(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to register delivery boy details.',
+      error: error.message
+    });
+  }
+}
+
+// Delivery Boy: Update order status
+  async updateOrderStatus(req, res) {
+    try {
+      const { uid } = req.user;
+      const { orderId } = req.params;
+      const { status, notes } = req.body;
+
+      if (!status) {
+        return res.status(400).json({
+          success: false,
+          message: 'Order status is required.',
+        });
+      }
+
+      console.log(`📝 Delivery boy ${uid} updating order ${orderId} status to ${status}`);
+
+      const result = await OrderService.updateOrderStatusByDeliveryBoy(orderId, status, uid, notes);
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          orderId: result.orderId,
+          newStatus: status
+        }
+      });
+
+    } catch (error) {
+      console.error('Update status controller error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update order status.',
+        error: error.message
+      });
+    }
+  }
+
+// Delivery Boy: Get assigned orders sorted by distance
+  // deliveryboy_controller.js
+
+async getOrders(req, res) {
+  try {
+    const { uid } = req.user;
+    const { lat, lon, date, slot, status } = req.query; // Add new 'status' parameter
+
+    if (!lat || !lon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Delivery boy location (lat and lon) is required.',
+      });
+    }
+
+    console.log(`🚚 Fetching orders for delivery boy ${uid} at location (${lat}, ${lon}) with date: ${date}, slot: ${slot}, status: ${status}`);
+
+    const orders = await OrderService.getDeliveryBoyOrders(uid, parseFloat(lat), parseFloat(lon), date, slot, status);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Orders retrieved successfully.',
+      data: { orders }
+    });
+  } catch (error) {
+    console.error('Get orders controller error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders.',
       error: error.message
     });
   }

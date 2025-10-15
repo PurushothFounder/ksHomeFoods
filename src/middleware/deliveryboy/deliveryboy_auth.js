@@ -1,3 +1,4 @@
+// deliveryboy_auth.js
 const { getAuth } = require('../../config/firebase');
 
 /**
@@ -25,12 +26,12 @@ const authenticateDeliveryBoyToken = async (req, res, next) => {
 
     const decodedToken = await firebaseAuth.verifyIdToken(idToken);
 
-    // Attach decoded user info to request
+    // Attach all relevant decoded user info to request
     req.user = {
       uid: decodedToken.uid,
-      email: decodedToken.email,
-      // You can add more claims here if you set them in Firebase Auth
-      // For example, custom claims for role
+      email: decodedToken.email || null,
+      displayName: decodedToken.name || null, // <-- Get display name
+      phoneNumber: decodedToken.phone_number || null, // <-- Get phone number
       authTimestamp: new Date().toISOString()
     };
 

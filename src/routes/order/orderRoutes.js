@@ -1,4 +1,3 @@
-// routes/orders/orderRoutes.js
 const express = require('express');
 const router = express.Router();
 const OrderController = require('../../controllers/order/orderController');
@@ -6,10 +5,21 @@ const { authenticateToken } = require('../../middleware/users/auth');
 const { adminAuth } = require('../../middleware/admin/adminAuth');
 
 // =============================================================================
+// PUBLIC ROUTES (No authentication required)
+// =============================================================================
+
+// Webhook endpoint for Cashfree payment status updates
+router.post('/cashfree-webhook', express.json(), OrderController.handleCashfreeWebhook); 
+
+router.get('/payment-failed', OrderController.paymentFailed);
+router.get('/order-success', OrderController.orderSuccess);
+router.get('/verify-payment', OrderController.verifyPaymentStatus);
+
+// =============================================================================
 // USER ROUTES (require user authentication)
 // =============================================================================
 
-// Place a new order
+// Place a new order (Handles both COD and initializes Online Payment)
 router.post('/', authenticateToken, OrderController.placeOrder);
 
 // Get user's orders
@@ -45,5 +55,7 @@ router.patch('/admin/:orderId/assign-delivery-boy', adminAuth, OrderController.a
 
 // Admin cancel order
 router.patch('/admin/:orderId/cancel', adminAuth, OrderController.adminCancelOrder);
+
+router.get('/admin/orders/date-range', adminAuth, OrderController.getOrdersByDate);
 
 module.exports = router;

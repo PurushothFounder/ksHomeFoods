@@ -30,7 +30,7 @@ class Order {
     };
     
     // Order items from cart
-    this.items = data.items || []; // Array of {menuItemId, name, price, quantity, isVeg, imageUrl}
+    this.items = data.items || [];
     
     // Pricing
     this.subtotal = data.subtotal || 0;
@@ -40,14 +40,13 @@ class Order {
     this.totalAmount = data.totalAmount || 0;
     
     // Payment
-    this.paymentMethod = data.paymentMethod; // 'cod', 'online', 'wallet'
-    this.paymentStatus = data.paymentStatus || 'pending'; // 'pending', 'paid', 'failed', 'refunded'
-    this.paymentId = data.paymentId || null; // Payment gateway transaction ID
+    this.paymentMethod = data.paymentMethod;
+    this.paymentStatus = data.paymentStatus || 'pending';
+    this.paymentId = data.paymentId || null;
     
     // Order status and tracking
-    this.orderStatus = data.orderStatus || 'placed'; 
-    // Status flow: placed -> confirmed -> preparing -> ready -> picked_up -> on_the_way -> delivered -> cancelled
-    this.orderType = data.orderType || 'delivery'; // 'delivery', 'pickup'
+    this.orderStatus = data.orderStatus || 'placed';
+    this.orderType = data.orderType || 'delivery';
     
     // Delivery information
     this.estimatedDeliveryTime = data.estimatedDeliveryTime || null;
@@ -67,15 +66,13 @@ class Order {
     this.deliveredAt = data.deliveredAt || null;
     this.cancelledAt = data.cancelledAt || null;
     this.createdAt = data.createdAt || admin.firestore.FieldValue.serverTimestamp();
-    this.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    this.updatedAt = data.updatedAt || admin.firestore.FieldValue.serverTimestamp();
     
     // Additional fields
     this.cancellationReason = data.cancellationReason || null;
     this.customerRating = data.customerRating || null;
     this.customerReview = data.customerReview || null;
     this.isActive = data.isActive !== undefined ? data.isActive : true;
-  
-      // --- Add these fields for food orders ---
     this.orderDate = data.orderDate || null;
     this.slotTiming = data.slotTiming || null;
   }
@@ -136,13 +133,13 @@ class Order {
     return new Order({
       id: doc.id,
       ...data,
-      placedAt: data.placedAt?.toDate() || new Date(),
+      placedAt: data.placedAt?.toDate() || null,
       confirmedAt: data.confirmedAt?.toDate() || null,
       preparedAt: data.preparedAt?.toDate() || null,
       deliveredAt: data.deliveredAt?.toDate() || null,
       cancelledAt: data.cancelledAt?.toDate() || null,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
+      createdAt: data.createdAt?.toDate() || null,
+      updatedAt: data.updatedAt?.toDate() || null,
       estimatedDeliveryTime: data.estimatedDeliveryTime?.toDate() || null,
       actualDeliveryTime: data.actualDeliveryTime?.toDate() || null,
       orderDate: data.orderDate || null,
@@ -153,14 +150,10 @@ class Order {
   // Validation for order placement
   static validate(orderData) {
     const errors = [];
-
-    // User validation
     if (!orderData.userId) errors.push('User ID is required');
     if (!orderData.userName || orderData.userName.trim().length < 2) {
       errors.push('User name is required');
     }
-
-    // Address validation
     if (!orderData.deliveryAddress) {
       errors.push('Delivery address is required');
     } else {
@@ -171,8 +164,6 @@ class Order {
         errors.push('Address coordinates are required');
       }
     }
-
-    // Items validation
     if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
       errors.push('Order items are required');
     } else {
@@ -183,18 +174,13 @@ class Order {
         if (!item.quantity || item.quantity <= 0) errors.push(`Item ${index + 1}: Valid quantity is required`);
       });
     }
-
-    // Payment validation
     if (!orderData.paymentMethod) errors.push('Payment method is required');
     if (!['cod', 'online', 'wallet'].includes(orderData.paymentMethod)) {
       errors.push('Invalid payment method');
     }
-
-    // Pricing validation
     if (!orderData.totalAmount || orderData.totalAmount <= 0) {
       errors.push('Valid total amount is required');
     }
-
     return {
       isValid: errors.length === 0,
       errors
@@ -228,9 +214,9 @@ class Order {
 
   // Calculate estimated delivery time
   calculateEstimatedDeliveryTime() {
-    const basePreparationTime = 30; // 30 minutes base preparation
+    const basePreparationTime = 30;
     const itemsCount = this.items.reduce((sum, item) => sum + item.quantity, 0);
-    const additionalTime = Math.ceil(itemsCount / 5) * 5; // 5 minutes per 5 items
+    const additionalTime = Math.ceil(itemsCount / 5) * 5;
     
     const estimatedMinutes = basePreparationTime + additionalTime;
     const estimatedTime = new Date();

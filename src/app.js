@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path'); 
 const morgan = require('morgan');
 const { initializeFirebase } = require('./config/firebase');
 
@@ -25,13 +26,16 @@ const ticketRoutes = require('./routes/support/ticketRoutes');
 const policyRoutes = require('./routes/support/policyRoutes');
 const notificationRoutes = require('./routes/notifications/notificationRoutes');
 const deliveryBoyRoutes = require('./routes/deliveryboy/deliveryboyRoutes');
+const configRoutes = require('./routes/configRoutes'); // Import config routes
 // Middleware
 app.use(helmet());
+
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Apply a more permissive CORS configuration globally to handle all cases
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT',  'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
@@ -54,6 +58,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/delivery-boy', deliveryBoyRoutes);
+app.use('/api/config', configRoutes); 
 
 // Basic routes
 app.get('/', (req, res) => {

@@ -99,6 +99,29 @@ class DeliveryBoy {
   }
 
   /**
+   * Fetches all active Delivery Boys who service a given pincode.
+   * @param {string} pincode The pincode to search for.
+   * @returns {Promise<DeliveryBoy[]>} A promise that resolves to an array of DeliveryBoy instances.
+   */
+  static async getByPincode(pincode) {
+    try {
+      const snapshot = await db.collection('deliveryBoys')
+        .where('deliveryPincodes', 'array-contains', pincode)
+        .where('isActive', '==', true)
+        .get();
+      
+      if (snapshot.empty) {
+        return [];
+      }
+      
+      return snapshot.docs.map(doc => this.fromFirestore(doc));
+    } catch (error) {
+      console.error('Error fetching delivery boys by pincode:', error);
+      throw new Error(`Failed to get delivery boys by pincode: ${error.message}`);
+    }
+  }
+
+  /**
    * Creates or updates a delivery boy in Firestore.
    * @param {object} data The delivery boy data.
    * @returns {Promise<DeliveryBoy>} A promise that resolves to the saved DeliveryBoy instance.
@@ -106,8 +129,19 @@ class DeliveryBoy {
   static async set(data) {
     try {
       const docRef = this.getDocRef(data.uid);
-      await docRef.set(new DeliveryBoy(data).toFirestore(), { merge: true });
-      return this.getByUid(data.uid);
+      const existingDoc = await docRef.get();
+      
+      // If the document already exists, get the current data and merge it with the new data
+      if (existingDoc.exists) {
+          const existingData = existingDoc.data();
+          const mergedData = { ...existingData, ...data };
+          await docRef.set(mergedData, { merge: true });
+          return this.getByUid(data.uid);
+      } else {
+          // If the document does not exist, create a new one
+          await docRef.set(new DeliveryBoy(data).toFirestore(), { merge: true });
+          return this.getByUid(data.uid);
+      }
     } catch (error) {
       console.error('Error saving delivery boy:', error);
       throw new Error(`Failed to save delivery boy: ${error.message}`);

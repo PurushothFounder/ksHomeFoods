@@ -25,4 +25,20 @@ router.post('/register', authenticateDeliveryBoyToken, DeliveryBoyController.reg
  */
 router.get('/profile', authenticateDeliveryBoyToken, DeliveryBoyController.getProfile);
 
+/**
+ * @route   GET /api/delivery-boy/orders
+ * @desc    Gets the assigned orders for the logged-in delivery boy, sorted by distance.
+ * @access  Private
+ */
+router.get('/orders', authenticateDeliveryBoyToken, DeliveryBoyController.getOrders);
+
+/**
+ * @route   PATCH /api/delivery-boy/orders/:orderId/status
+ * @desc    Allows a delivery boy to update the status of an assigned order.
+ * @access  Private
+ */
+router.patch('/orders/:orderId/status', authenticateDeliveryBoyToken, DeliveryBoyController.updateOrderStatus);
+
+
+
 module.exports = router;

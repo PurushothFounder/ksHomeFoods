@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Processing Payment</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script type="text/javascript">
+        // Get the full URL with query parameters from the browser
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+
+        const status = params.get('status');
+        const orderId = params.get('orderId');
+        const message = params.get('message');
+        
+        // Construct the standard URL for your Flutter app.
+        // We use the '/payment-status' route that you have already defined.
+        let appUrl = "/payment-status?";
+        if (status) {
+            appUrl += `status=${status}`;
+        }
+        if (orderId) {
+            appUrl += `&orderId=${orderId}`;
+        }
+        if (message) {
+            appUrl += `&message=${encodeURIComponent(message)}`;
+        }
+
+        console.log("Redirecting to app URL:", appUrl);
+
+        // Redirect to the new URL. This will trigger GoRouter.
+        window.location.replace(appUrl);
+    </script>
+</head>
+<body>
+    <div style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
+        <p style="font-size: 24px;">Processing your payment...</p>
+        <p style="font-size: 16px; color: #666;">Please wait while we confirm your order.</p>
+    </div>
+</body>
+</html>
