@@ -6,7 +6,7 @@ class MenuItemController {
     try {
       // Extract pagination parameters from query
       const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const limit = parseInt(req.query.limit) || 100;
       const search = req.query.search || '';
       const sortBy = req.query.sortBy || 'name';
       const sortOrder = req.query.sortOrder || 'asc';
@@ -196,7 +196,7 @@ class MenuItemController {
     try {
       const { categoryId } = req.params;
       const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const limit = parseInt(req.query.limit) || 100;
       const search = req.query.search || '';
       const sortBy = req.query.sortBy || 'name';
       const sortOrder = req.query.sortOrder || 'asc';
@@ -242,7 +242,7 @@ class MenuItemController {
     try {
       const { categoryName } = req.params;
       const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const limit = parseInt(req.query.limit) || 100;
       const search = req.query.search || '';
       const sortBy = req.query.sortBy || 'name';
       const sortOrder = req.query.sortOrder || 'asc';

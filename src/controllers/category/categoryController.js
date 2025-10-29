@@ -30,7 +30,7 @@ class CategoryController {
     try {
       const { type } = req.params;
       
-      if (!['breakfast', 'lunch', 'snacks', 'dinner', 'products'].includes(type)) {
+      if (!['breakfast', 'lunch', 'snacks', 'dinner','essentials', 'products'].includes(type)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid category type',

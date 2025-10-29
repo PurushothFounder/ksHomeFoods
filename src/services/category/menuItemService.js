@@ -43,7 +43,7 @@ class MenuItemService {
       for (const doc of allCategoriesSnapshot.docs) {
         const data = doc.data();
         if ((data.type && data.type.toLowerCase() === categoryName.toLowerCase()) ||
-            (data.name && data.name.toLowerCase() === categoryName.toLowerCase())) {
+          (data.name && data.name.toLowerCase() === categoryName.toLowerCase())) {
           return doc.id;
         }
       }
@@ -116,7 +116,7 @@ class MenuItemService {
   async getAllMenuItems({ page = 1, limit = 20, search = '', sortBy = 'name', sortOrder = 'asc', filters = {} }) {
     try {
       // Build base query
-      let query = this.collection.where('isAvailable', '==', true);
+      let query = this.collection;
 
       // Apply filters
       if (filters.isVeg !== undefined) {
@@ -134,14 +134,26 @@ class MenuItemService {
         const item = MenuItem.fromFirestore(doc);
         // Apply search filter in memory if search term provided
         if (!search || 
-            item.name.toLowerCase().includes(search.toLowerCase()) || 
-            item.description.toLowerCase().includes(search.toLowerCase())) {
+          item.name.toLowerCase().includes(search.toLowerCase()) || 
+          item.description.toLowerCase().includes(search.toLowerCase())) {
           allItems.push(item);
         }
       });
 
       // Sort items
       allItems.sort((a, b) => {
+        // 🎯 NEW: Primary Sort - Availability (True items first)
+        // Handle cases where isAvailable might be undefined/null (treat as available)
+        if (a.isAvailable === undefined) a.isAvailable = true;
+        if (b.isAvailable === undefined) b.isAvailable = true;
+
+        let availabilityComparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
+        
+        if (availabilityComparison !== 0) {
+            return availabilityComparison;
+        }
+
+        // Secondary Sort: User-requested sort
         let comparison = 0;
         
         switch(sortBy) {
@@ -212,7 +224,6 @@ class MenuItemService {
       // Get all items in this category
       const snapshot = await this.collection
         .where('categories', 'array-contains', categoryId)
-        .where('isAvailable', '==', true)
         .get();
 
       let allItems = [];
@@ -220,14 +231,25 @@ class MenuItemService {
         const item = MenuItem.fromFirestore(doc);
         // Apply search filter
         if (!search || 
-            item.name.toLowerCase().includes(search.toLowerCase()) || 
-            item.description.toLowerCase().includes(search.toLowerCase())) {
+          item.name.toLowerCase().includes(search.toLowerCase()) || 
+          item.description.toLowerCase().includes(search.toLowerCase())) {
           allItems.push(item);
         }
       });
 
       // Sort items
       allItems.sort((a, b) => {
+        // 🎯 NEW: Primary Sort - Availability (True items first)
+         if (a.isAvailable === undefined) a.isAvailable = true;
+         if (b.isAvailable === undefined) b.isAvailable = true;
+
+         let availabilityComparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
+         
+         if (availabilityComparison !== 0) {
+             return availabilityComparison;
+         }
+
+        // Secondary Sort: User-requested sort
         let comparison = 0;
         
         switch(sortBy) {
@@ -274,194 +296,216 @@ class MenuItemService {
 
   // Get menu items by category name with pagination
   async getMenuItemsByCategoryName({ categoryName, page = 1, limit = 20, search = '', sortBy = 'name', sortOrder = 'asc' }) {
-  try {
-    // Special handling for "products" category
-    if (categoryName.toLowerCase() === 'products') {
-      return await this.getAllProducts({ page, limit, search, sortBy, sortOrder });
-    }
-
-    // Get all matching category IDs
-    const categoryIds = await this.getCategoryIdsByName(categoryName);
-
-    if (categoryIds.length === 0) {
-    throw new Error(`Category with name or type '${categoryName}' not found`);
-    }
-
-    // Get category info for response (first one)
-    const categoryDoc = await this.categoriesCollection.doc(categoryIds[0]).get();
-    const categoryInfo = categoryDoc.exists
-      ? { id: categoryIds[0], ...categoryDoc.data() }
-      : { id: categoryIds[0], name: categoryName };
-
-    // Fetch menu items that belong to any of these categories
-    let allItems = [];
-    for (const categoryId of categoryIds) {
-      const snapshot = await this.collection
-        .where('categories', 'array-contains', categoryId)
-        .where('isAvailable', '==', true)
-        .get();
-
-      snapshot.forEach(doc => {
-        const item = MenuItem.fromFirestore(doc);
-        // Avoid duplicates
-        if (!allItems.some(i => i.id === item.id)) {
- // Apply search filter
-          if (
-            !search ||
-            item.name.toLowerCase().includes(search.toLowerCase()) ||
-            item.description.toLowerCase().includes(search.toLowerCase())
-          ) {
-            allItems.push(item);
-          }
-        }
-      });
-    }
-
-    // Sort items
-    allItems.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'name':
-           comparison = a.name.localeCompare(b.name);
-          break;
-        case 'price':
-          comparison = a.price - b.price;
-          break;
-        default:
-          comparison = a.name.localeCompare(b.name);
+    try {
+      // Special handling for "products" category
+      if (categoryName.toLowerCase() === 'products') {
+        // Note: getAllProducts also needs the new sort logic, ensure it is covered below
+        return await this.getAllProducts({ page, limit, search, sortBy, sortOrder });
       }
-      return sortOrder === 'desc' ? -comparison : comparison;
-    });
 
-    // Pagination
-    const totalItems = allItems.length;
-    const totalPages = Math.ceil(totalItems / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedItems = allItems.slice(startIndex, endIndex);
+      // Get all matching category IDs
+      const categoryIds = await this.getCategoryIdsByName(categoryName);
 
-    return {
-      menuItems: paginatedItems,
-      categoryInfo,
-      currentPage: page,
-totalPages,
-      totalItems,
-      itemsPerPage: limit,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    };
-  } catch (error) {
-    console.error('Error fetching menu items by category name:', error);
-    throw error;
+      if (categoryIds.length === 0) {
+        throw new Error(`Category with name or type '${categoryName}' not found`);
+      }
+
+      // Get category info for response (first one)
+      const categoryDoc = await this.categoriesCollection.doc(categoryIds[0]).get();
+      const categoryInfo = categoryDoc.exists
+        ? { id: categoryIds[0], ...categoryDoc.data() }
+        : { id: categoryIds[0], name: categoryName };
+
+      // Fetch menu items that belong to any of these categories
+      let allItems = [];
+      for (const categoryId of categoryIds) {
+        const snapshot = await this.collection
+          .where('categories', 'array-contains', categoryId)
+          .get();
+
+        snapshot.forEach(doc => {
+          const item = MenuItem.fromFirestore(doc);
+          // Avoid duplicates
+          if (!allItems.some(i => i.id === item.id)) {
+            // Apply search filter
+            if (
+              !search ||
+              item.name.toLowerCase().includes(search.toLowerCase()) ||
+              item.description.toLowerCase().includes(search.toLowerCase())
+            ) {
+              allItems.push(item);
+            }
+          }
+        });
+      }
+
+      // Sort items
+      allItems.sort((a, b) => {
+        // 🎯 NEW: Primary Sort - Availability (True items first)
+         if (a.isAvailable === undefined) a.isAvailable = true;
+         if (b.isAvailable === undefined) b.isAvailable = true;
+
+         let availabilityComparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
+         
+         if (availabilityComparison !== 0) {
+             return availabilityComparison;
+         }
+
+        // Secondary Sort: User-requested sort
+        let comparison = 0;
+        switch (sortBy) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name);
+            break;
+          case 'price':
+            comparison = a.price - b.price;
+            break;
+          default:
+            comparison = a.name.localeCompare(b.name);
+        }
+        return sortOrder === 'desc' ? -comparison : comparison;
+      });
+
+      // Pagination
+      const totalItems = allItems.length;
+      const totalPages = Math.ceil(totalItems / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedItems = allItems.slice(startIndex, endIndex);
+
+      return {
+        menuItems: paginatedItems,
+        categoryInfo,
+        currentPage: page,
+        totalPages,
+        totalItems,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      };
+    } catch (error) {
+      console.error('Error fetching menu items by category name:', error);
+      throw error;
+    }
   }
-}
 
   // Get all products (when user selects "Products" category)
   async getAllProducts({ page = 1, limit = 20, search = '', sortBy = 'name', sortOrder = 'asc' }) {
-  try {
-    // Get all category IDs where type is 'products'
-    const categoryIds = [];
-    const snapshot = await this.categoriesCollection
-      .where('type', '==', 'products')
-      .where('isActive', '==', true)
-      .get();
-
-    snapshot.forEach(doc => {
-      categoryIds.push(doc.id);
-    });
-
-    if (categoryIds.length === 0) {
-      // If no products category exists, return empty result
-      return {
-        menuItems: [],
-        categoryInfo: {
-          id: 'products',
-          name: 'Products',
-          type: 'products',
-          description: 'Physical products with delivery'
-        },
-         currentPage: page,
-        totalPages: 0,
-        totalItems: 0,
-        itemsPerPage: limit,
-        hasNextPage: false,
-        hasPrevPage: false
-      };
-    }
-
-    // Fetch menu items that belong to any of these categories
-    let allItems = [];
-    for (const categoryId of categoryIds) {
-      const itemsSnapshot = await this.collection
-        .where('categories', 'array-contains', categoryId)
-        .where('isAvailable', '==', true)
+    try {
+      // Get all category IDs where type is 'products'
+      const categoryIds = [];
+      const snapshot = await this.categoriesCollection
+        .where('type', '==', 'products')
+        .where('isActive', '==', true)
         .get();
 
-      itemsSnapshot.forEach(doc => {
-        const item = MenuItem.fromFirestore(doc);
-        // Avoid duplicates
-        if (!allItems.some(i => i.id === item.id)) {
- if (
-            !search ||
-            item.name.toLowerCase().includes(search.toLowerCase()) ||
-            item.description.toLowerCase().includes(search.toLowerCase())
-          ) {
-            allItems.push(item);
-          }
-        }
+      snapshot.forEach(doc => {
+        categoryIds.push(doc.id);
       });
-    }
 
-    // Sort items
-    allItems.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'price':
-          comparison = a.price - b.price;
-          break;
-        case 'createdAt':
-          comparison = (a.createdAt?.toDate?.() || 0) - (b.createdAt?.toDate?.() || 0);
-          break;
-        default:
-          comparison = a.name.localeCompare(b.name);
+      if (categoryIds.length === 0) {
+        // If no products category exists, return empty result
+        return {
+          menuItems: [],
+          categoryInfo: {
+            id: 'products',
+            name: 'Products',
+            type: 'products',
+            description: 'Physical products with delivery'
+          },
+          currentPage: page,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false
+        };
       }
-      return sortOrder === 'desc' ? -comparison : comparison;
-    });
 
-    // Pagination
-    const totalItems = allItems.length;
-    const totalPages = Math.ceil(totalItems / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedItems = allItems.slice(startIndex, endIndex);
+      // Fetch menu items that belong to any of these categories
+      let allItems = [];
+      for (const categoryId of categoryIds) {
+        const itemsSnapshot = await this.collection
+          .where('categories', 'array-contains', categoryId)
+          .get();
 
-    // Get product sub-categories for filtering options
-    const subCategories = await this.getProductSubCategories();
+        itemsSnapshot.forEach(doc => {
+          const item = MenuItem.fromFirestore(doc);
+          // Avoid duplicates
+          if (!allItems.some(i => i.id === item.id)) {
+            if (
+              !search ||
+              item.name.toLowerCase().includes(search.toLowerCase()) ||
+              item.description.toLowerCase().includes(search.toLowerCase())
+            ) {
+              allItems.push(item);
+            }
+          }
+        });
+      }
 
-    // Use the first products category for categoryInfo
-    const categoryDoc = await this.categoriesCollection.doc(categoryIds[0]).get();
-    const categoryInfo = categoryDoc.exists
-      ? { id: categoryIds[0], ...categoryDoc.data(), subCategories }
+      // Sort items
+      allItems.sort((a, b) => {
+        // 🎯 NEW: Primary Sort - Availability (True items first)
+         if (a.isAvailable === undefined) a.isAvailable = true;
+         if (b.isAvailable === undefined) b.isAvailable = true;
+
+         let availabilityComparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
+         
+         if (availabilityComparison !== 0) {
+             return availabilityComparison;
+         }
+         
+        // Secondary Sort: User-requested sort
+        let comparison = 0;
+        switch (sortBy) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name);
+            break;
+          case 'price':
+            comparison = a.price - b.price;
+            break;
+          case 'createdAt':
+            comparison = (a.createdAt?.toDate?.() || 0) - (b.createdAt?.toDate?.() || 0);
+            break;
+          default:
+            comparison = a.name.localeCompare(b.name);
+        }
+        return sortOrder === 'desc' ? -comparison : comparison;
+      });
+
+      // Pagination
+      const totalItems = allItems.length;
+      const totalPages = Math.ceil(totalItems / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedItems = allItems.slice(startIndex, endIndex);
+
+      // Get product sub-categories for filtering options
+      const subCategories = await this.getProductSubCategories();
+
+      // Use the first products category for categoryInfo
+      const categoryDoc = await this.categoriesCollection.doc(categoryIds[0]).get();
+      const categoryInfo = categoryDoc.exists
+        ? { id: categoryIds[0], ...categoryDoc.data(), subCategories }
         : { id: categoryIds[0], name: 'Products', type: 'products', subCategories };
 
-    return {
-      menuItems: paginatedItems,
-      categoryInfo,
-      currentPage: page,
-      totalPages,
-      totalItems,
-      itemsPerPage: limit,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    };
-  } catch (error) {
-    console.error('Error fetching all products:', error);
-    throw error;
+      return {
+        menuItems: paginatedItems,
+        categoryInfo,
+        currentPage: page,
+        totalPages,
+        totalItems,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      };
+    } catch (error) {
+      console.error('Error fetching all products:', error);
+      throw error;
+    }
   }
-}
+
   // Get products by sub-category (e.g., clothes, electronics)
   async getProductsBySubCategory({ subCategoryId, page = 1, limit = 20, search = '', sortBy = 'name', sortOrder = 'asc' }) {
     try {
@@ -481,8 +525,7 @@ totalPages,
 
       // Query for products with specific sub-category
       let query = this.collection
-        .where('categories', 'array-contains', productsCategoryId)
-        .where('isAvailable', '==', true);
+        .where('categories', 'array-contains', productsCategoryId);
 
       // Add sub-category filter if not 'all'
       if (subCategoryId !== 'all') {
@@ -496,14 +539,25 @@ totalPages,
         const item = MenuItem.fromFirestore(doc);
         // Apply search filter
         if (!search || 
-            item.name.toLowerCase().includes(search.toLowerCase()) || 
-            item.description.toLowerCase().includes(search.toLowerCase())) {
+          item.name.toLowerCase().includes(search.toLowerCase()) || 
+          item.description.toLowerCase().includes(search.toLowerCase())) {
           allItems.push(item);
         }
       });
 
       // Sort items
       allItems.sort((a, b) => {
+        // 🎯 NEW: Primary Sort - Availability (True items first)
+         if (a.isAvailable === undefined) a.isAvailable = true;
+         if (b.isAvailable === undefined) b.isAvailable = true;
+
+         let availabilityComparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
+         
+         if (availabilityComparison !== 0) {
+             return availabilityComparison;
+         }
+         
+        // Secondary Sort: User-requested sort
         let comparison = 0;
         
         switch(sortBy) {
@@ -634,27 +688,27 @@ totalPages,
   }
 
   async getCategoryIdsByName(categoryName) {
-  try {
-    const matchedIds = [];
-    const snapshot = await this.categoriesCollection
-      .where('isActive', '==', true)
-      .get();
+    try {
+      const matchedIds = [];
+      const snapshot = await this.categoriesCollection
+        .where('isActive', '==', true)
+        .get();
 
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      if (
-        (data.type && data.type.toLowerCase() === categoryName.toLowerCase()) ||
-        (data.name && data.name.toLowerCase() === categoryName.toLowerCase())
-      ) {
-        matchedIds.push(doc.id);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (
+          (data.type && data.type.toLowerCase() === categoryName.toLowerCase()) ||
+          (data.name && data.name.toLowerCase() === categoryName.toLowerCase())
+        ) {
+          matchedIds.push(doc.id);
+        }
       }
+      return matchedIds;
+    } catch (error) {
+      console.error('Error getting category IDs by name:', error);
+      return [];
     }
-    return matchedIds;
-  } catch (error) {
-    console.error('Error getting category IDs by name:', error);
-    return [];
   }
-}
 
   // Update menu item
   async updateMenuItem(itemId, { name, description, price, categories, imageUrl, isVeg, isBestseller, servingSize, productSubCategory, updatedBy }) {

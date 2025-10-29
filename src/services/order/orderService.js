@@ -212,18 +212,33 @@ class OrderService {
 
     // Admin: Get all orders with optional filters
     async getAllOrders(filters) {
-        let query = this.db.collection(this.collection);
-        if (filters.status) {
-            query = query.where('orderStatus', '==', filters.status);
-        }
-        if (filters.paymentMethod) {
-            query = query.where('paymentMethod', '==', filters.paymentMethod);
-        }
-        // ... (other filter logic)
-        query = query.orderBy('createdAt', 'desc').limit(filters.limit);
-        const snapshot = await query.get();
-        return snapshot.docs.map(doc => doc.data());
+    // 1. Destructure 'limit', but DO NOT set a default value of 50.
+    const { limit } = filters;
+    
+    let query = this.db.collection(this.collection);
+    
+    // ... (Your filter logic remains the same)
+    if (filters.status) {
+        query = query.where('orderStatus', '==', filters.status);
     }
+    if (filters.paymentMethod) {
+        query = query.where('paymentMethod', '==', filters.paymentMethod);
+    }
+    // ... (other filter logic)
+
+    query = query.orderBy('createdAt', 'desc');
+
+    // 2. ONLY apply the limit if it was passed in the filters.
+    if (limit) {
+        query = query.limit(limit);
+    }
+
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({
+        orderId: doc.id,
+        ...doc.data()
+    }));
+}
 
     // Admin: Get orders by pincode
     async getOrdersByPincode(pincode, status) {

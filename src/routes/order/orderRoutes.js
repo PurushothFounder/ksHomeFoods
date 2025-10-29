@@ -8,18 +8,22 @@ const { adminAuth } = require('../../middleware/admin/adminAuth');
 // PUBLIC ROUTES (No authentication required)
 // =============================================================================
 
-// Webhook endpoint for Cashfree payment status updates
-router.post('/cashfree-webhook', express.json(), OrderController.handleCashfreeWebhook); 
+// ➡️ CHANGE: Webhook endpoint for Razorpay payment status updates
+// IMPORTANT: Need to ensure a body parser (like 'raw-body') is used BEFORE express.json() 
+// for signature verification in production. For this context, we stick to express.json().
+router.post('/razorpay-webhook', express.json(), OrderController.handleRazorpayWebhook); 
 
+// Fallback success/failure endpoints (often used as redirect targets)
 router.get('/payment-failed', OrderController.paymentFailed);
 router.get('/order-success', OrderController.orderSuccess);
-router.get('/verify-payment', OrderController.verifyPaymentStatus);
+// ➡️ CHANGE: Verification endpoint after redirect
+router.get('/verify-payment', OrderController.verifyRazorpayPayment); 
 
 // =============================================================================
 // USER ROUTES (require user authentication)
 // =============================================================================
 
-// Place a new order (Handles both COD and initializes Online Payment)
+// Place a new order (Handles both COD and initializes Online Payment, which calls initializeRazorpayOrder internally)
 router.post('/', authenticateToken, OrderController.placeOrder);
 
 // Get user's orders

@@ -58,7 +58,7 @@ class Category {
       errors.push('Category name must be at least 2 characters');
     }
 
-    if (!categoryData.type || !['breakfast', 'lunch', 'snacks', 'dinner', 'products'].includes(categoryData.type)) {
+    if (!categoryData.type || !['breakfast', 'lunch', 'snacks', 'dinner','essentials', 'products'].includes(categoryData.type)) {
       errors.push('Invalid category type');
     }
 

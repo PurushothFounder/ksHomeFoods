@@ -1,5 +1,5 @@
 const OrderService = require('../../services/order/orderService');
-const CashfreeService = require('../../services/payment/cashfree_payment_service');
+const RazorpayService = require('../../services/payment/razorpay_payment_service'); 
 const Order = require('../../models/order/orderModel');
 const { getFirestore, admin } = require('../../config/firebase');
 
@@ -7,9 +7,12 @@ class OrderController {
     constructor() {
         // Binding all methods to the class instance to preserve 'this' context.
         this.placeOrder = this.placeOrder.bind(this);
-        this.initializePayment = this.initializePayment.bind(this);
-        this.handleCashfreeWebhook = this.handleCashfreeWebhook.bind(this);
-        this.verifyPaymentStatus = this.verifyPaymentStatus.bind(this);
+        // ➡️ CHANGE: Renaming the method for online payment initialization
+        this.initializeRazorpayOrder = this.initializeRazorpayOrder.bind(this); 
+        // ➡️ CHANGE: Renaming the webhook handler
+        this.handleRazorpayWebhook = this.handleRazorpayWebhook.bind(this); 
+        // ➡️ CHANGE: Renaming the verification endpoint
+        this.verifyRazorpayPayment = this.verifyRazorpayPayment.bind(this); 
         this.getOrder = this.getOrder.bind(this);
         this.getOrdersByDate = this.getOrdersByDate.bind(this);
         this.getUserOrders = this.getUserOrders.bind(this);
@@ -26,7 +29,6 @@ class OrderController {
     /**
      * POST /api/orders
      * Acts as a router: directs flow based on paymentMethod (COD vs. Online).
-     * Online payments are delegated to initializePayment (below).
      */
     async placeOrder(req, res) {
         console.log('--- placeOrder: Received request ---');
@@ -38,8 +40,9 @@ class OrderController {
             
             // If the user selected Online Payment, delegate to the initialization method.
             if (paymentMethod === 'online') {
-                console.log('➡️ Directing to initializePayment for online payment.');
-                return this.initializePayment(req, res);
+                console.log('➡️ Directing to initializeRazorpayOrder for online payment.');
+                // ➡️ CHANGE: Call the new Razorpay initialization method
+                return this.initializeRazorpayOrder(req, res); 
             }
 
             // --- Handle COD (or other non-gateway payments) ---
@@ -77,11 +80,12 @@ class OrderController {
      * POST /api/orders/initialize-payment (Used internally when paymentMethod is 'online')
      * 1. Fetches user/address data.
      * 2. Creates a PENDING order in Firestore using createBaseOrder.
-     * 3. Calls CashfreeService to create a payment session (session_id).
-     * 4. Returns session_id to the Flutter frontend to initiate the payment.
+     * 3. Calls RazorpayService to create a Razorpay Order ID.
+     * 4. Returns Razorpay Order ID to the Flutter frontend to initiate the payment.
+     * ➡️ REPLACES initializePayment (renamed to initializeRazorpayOrder for clarity)
      */
-    async initializePayment(req, res) {
-    console.log('--- initializePayment: Starting online payment flow ---');
+    async initializeRazorpayOrder(req, res) {
+    console.log('--- initializeRazorpayOrder: Starting online payment flow ---');
     const { uid, email } = req.user;
     const { deliveryAddressId, items, subtotal, deliveryFee, taxAmount, discountAmount, totalAmount, orderDate, slotTiming, orderType } = req.body;
     
@@ -123,7 +127,7 @@ class OrderController {
     });
     
     let pendingOrderRef;
-    let pendingOrderId;
+    let pendingOrderId; // This is your internal Firestore ID
 
     try {
         console.log('   💾 Saving base order document to Firestore...');
@@ -136,74 +140,96 @@ class OrderController {
         return res.status(400).json({ success: false, message: e.message || "Failed to create base order." });
     }
     
-    // --- 5. Call CashfreeService to generate session ---
-    console.log('\n5. Calling Cashfree API to generate session...');
+    // --- 5. Call RazorpayService to create order ---
+    console.log('\n5. Calling Razorpay API to create order...');
     // PASS THE INTERNAL FIRESTORE ORDER ID
-    const cashfreeResponse = await CashfreeService.createOrderSession(
+    // ➡️ CHANGE: Use RazorpayService.createOrder
+    const razorpayResponse = await RazorpayService.createOrder(
         pendingOrderId,
-        totalAmount,
+        totalAmount, 
         { userId: uid, userEmail: email, userPhone: userProfile.phoneNumber || address.contactPhone }
     );
-    console.log('   Cashfree response received:', JSON.stringify(cashfreeResponse, null, 2));
+    console.log('   Razorpay response received:', JSON.stringify(razorpayResponse, null, 2));
 
-    if (cashfreeResponse.success) {
-        console.log('\n   ✅ Cashfree session created. Updating order document...');
+    if (razorpayResponse.success) {
+        console.log('\n   ✅ Razorpay order created. Updating order document...');
+        // ➡️ CHANGE: Store the Razorpay Order ID
         await pendingOrderRef.update({
-            // STORE BOTH THE RAW CF_ORDER_ID (the number) AND YOUR UNIQUE STRING ID
-            // THIS IS THE KEY FIX
-            cashfreeOrderId: cashfreeResponse.cf_order_id,
-            uniqueCashfreeOrderId: cashfreeResponse.unique_cashfree_order_id,
+            razorpayOrderId: razorpayResponse.razorpayOrderId,
+            // You may keep cashfreeOrderId/uniqueCashfreeOrderId for backwards compatibility if needed, 
+            // but for Razorpay, the Razorpay Order ID is the key unique identifier.
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        console.log(`   ✅ Order document updated with Cashfree Order ID: ${cashfreeResponse.cf_order_id}`);
+        console.log(`   ✅ Order document updated with Razorpay Order ID: ${razorpayResponse.razorpayOrderId}`);
         return res.status(200).json({
             success: true,
-            message: 'Payment session initialized.',
+            message: 'Razorpay order initialized.',
             data: {
-                orderId: pendingOrderId,
-                cfOrderId: cashfreeResponse.cf_order_id,
-                sessionId: cashfreeResponse.session_id,
+                orderId: pendingOrderId, // Your internal ID
+                // ➡️ CHANGE: Send the Razorpay Order ID to the frontend
+                razorpayOrderId: razorpayResponse.razorpayOrderId, 
+                amount: razorpayResponse.amount, 
+                currency: razorpayResponse.currency
             }
         });
     } else {
-        console.error('\n❌ Cashfree session creation failed. Cancelling pending order...');
+        console.error('\n❌ Razorpay order creation failed. Cancelling pending order...');
+        // Order failed to be created on Razorpay's end, so cancel locally.
         await pendingOrderRef.update({
             orderStatus: 'cancelled',
-            cancellationReason: 'Payment gateway session initialization failed.',
+            cancellationReason: 'Payment gateway order initialization failed.',
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         console.log('   ✅ Pending order cancelled due to payment failure.');
         return res.status(400).json({
             success: false,
-            message: `Payment initialization failed: ${cashfreeResponse.message}`,
-            error: cashfreeResponse.message
+            message: `Payment initialization failed: ${razorpayResponse.message}`,
+            error: razorpayResponse.message
         });
     }
 }
 
     /**
-     * POST /api/orders/cashfree-webhook (Public Endpoint)
-     * Cashfree calls this on payment success/failure. No user auth required.
+     * POST /api/orders/razorpay-webhook (Public Endpoint)
+     * Razorpay calls this on payment success/failure. No user auth required.
+     * ➡️ REPLACES handleCashfreeWebhook
      */
-    async handleCashfreeWebhook(req, res) {
-        const { data, type } = req.body;
-        // const signature = req.headers['x-cf-signature']; // Signature verification is critical
+    async handleRazorpayWebhook(req, res) {
+        // Razorpay sends the signature in the header.
+        const signature = req.headers['x-razorpay-signature']; 
+        const { event, payload } = req.body; // Assuming the body is parsed JSON
 
-        console.log(`Webhook Received: ${type} for CF Order ID: ${data?.order?.cf_order_id}`);
+        console.log(`Webhook Received: ${event} for Razorpay Order ID: ${payload?.order?.entity?.id}`);
 
-        if (type === 'ORDER_PAID' || type === 'PAYMENT_SUCCESS') {
-            const cfOrderId = data.order.cf_order_id;
-            const paymentId = data.payment.cf_payment_id;
+        // --- 1. Signature Verification (CRITICAL STEP) ---
+        // NOTE: In a production environment, this verification must use the RAW request body string.
+        try {
+            if (!RazorpayService.verifyWebhookSignature(req.body, signature)) {
+                console.error('❌ Webhook signature verification failed!');
+                return res.status(401).json({ status: 'Invalid Signature' });
+            }
+        } catch (error) {
+             console.error('❌ Webhook signature verification error:', error);
+             return res.status(500).json({ status: 'Internal Server Error during verification' });
+        }
+        
+        console.log('✅ Webhook signature verified.');
+
+        // --- 2. Event Handling (Payment Captured/Success) ---
+        if (event === 'payment.captured') {
+            const razorpayOrderId = payload.order.entity.id;
+            const paymentId = payload.payment.entity.id;
 
             try {
                 const db = getFirestore();
                 
-                // Find order by Cashfree Order ID
-                const orderQuery = await db.collection('orders').where('cashfreeOrderId', '==', cfOrderId).limit(1).get();
+                // ➡️ CHANGE: Find order by Razorpay Order ID
+                const orderQuery = await db.collection('orders').where('razorpayOrderId', '==', razorpayOrderId).limit(1).get();
                 
                 if (orderQuery.empty) {
+                    console.error(`❌ Order not found in DB for Razorpay ID: ${razorpayOrderId}`);
                     return res.status(404).json({ status: 'Order not found in DB' });
                 }
 
@@ -229,13 +255,32 @@ class OrderController {
             }
         }
         
-        if (type === 'PAYMENT_FAILED' || type === 'ORDER_FAILED') {
-            // NOTE: Add logic here to find the pending order by cf_order_id and update its status to 'cancelled'
-            console.log(`Payment failed webhook received for CF Order ID: ${data.order.cf_order_id}`);
-            // You can implement similar logic to the success case here to update the order status to 'cancelled'
+        // --- 3. Event Handling (Payment Failed/Cancelled) ---
+        if (event === 'payment.failed' || event === 'order.paid.failed') {
+            const razorpayOrderId = payload.order.entity.id;
+            console.log(`Payment failed webhook received for Razorpay Order ID: ${razorpayOrderId}`);
+            
+            try {
+                const db = getFirestore();
+                const orderQuery = await db.collection('orders').where('razorpayOrderId', '==', razorpayOrderId).limit(1).get();
+                
+                if (!orderQuery.empty) {
+                    const orderRef = orderQuery.docs[0].ref;
+                    await orderRef.update({
+                        orderStatus: 'cancelled',
+                        paymentStatus: 'failed',
+                        cancellationReason: 'Payment failed via Razorpay webhook.',
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                     console.log(`Order ${orderQuery.docs[0].id} updated to CANCELLED.`);
+                }
+            } catch(e) {
+                 console.error('Error handling payment.failed webhook:', e);
+            }
         }
 
-        return res.status(200).json({ status: 'Webhook received but action not taken' });
+        return res.status(200).json({ status: 'Webhook received but event not processed' });
     }
     
     // User: Get order by ID
@@ -710,112 +755,127 @@ class OrderController {
     }
 
     async paymentFailed(req, res) {
-    const { orderId, message } = req.query;
-    // Handle the payment failed logic here
-    return res.status(200).json({ success: false, message: message || 'Payment failed', orderId });
-}
+        const { orderId, message } = req.query;
+        // Handle the payment failed logic here
+        return res.status(200).json({ success: false, message: message || 'Payment failed', orderId });
+    }
 
-async orderSuccess(req, res) {
-    const { orderId } = req.query;
-    // Handle the payment success logic here
-    return res.status(200).json({ success: true, message: 'Payment successful', orderId });
-}
+    async orderSuccess(req, res) {
+        const { orderId } = req.query;
+        // Handle the payment success logic here
+        return res.status(200).json({ success: true, message: 'Payment successful', orderId });
+    }
 
     /**
      * GET /api/orders/verify-payment (Public Endpoint)
-     * Cashfree redirects here after a payment attempt. This endpoint must be public.
-     * It verifies the payment status with Cashfree and updates the order.
+     * Razorpay redirects here after a payment attempt. This endpoint must be public.
+     * It verifies the payment status using signature verification and updates the order.
+     * ➡️ REPLACES verifyPaymentStatus (renamed to verifyRazorpayPayment for clarity)
      */
 
-// D:\Node\ks-home-foods-backend\src\controllers\order\orderController.js
+    async verifyRazorpayPayment(req, res) {
+        console.log('--- verifyRazorpayPayment: Received payment verification request ---');
+        // ➡️ CHANGE: Getting verification parameters from query/body sent by Razorpay Checkout
+        const { 
+            razorpay_order_id, 
+            razorpay_payment_id, 
+            razorpay_signature, 
+            order_id // This is your internal ID, which you can map back.
+        } = req.query; 
 
-async verifyPaymentStatus(req, res) {
-    console.log('--- verifyPaymentStatus: Received payment verification request ---');
-    const { order_id: incomingId } = req.query; 
-    console.log('   ➡️ Incoming Order ID from query:', incomingId);
-
-    if (!incomingId) {
-        return res.status(400).json({
-            success: false,
-            message: 'Missing order ID in request.'
-        });
-    }
-
-    try {
-        const db = getFirestore();
+        console.log('   ➡️ Incoming Razorpay Order ID:', razorpay_order_id);
         
-        // Use the incoming ID to find the document.
-        // It could be either the numerical cashfreeOrderId or your custom uniqueCashfreeOrderId.
-        // We'll first try to find it by the numerical cashfreeOrderId, which seems to be the one Cashfree is sending.
-        const numericalId = parseInt(incomingId);
-        
-        let orderQuery;
-        let queryField;
-
-        if (!isNaN(numericalId)) {
-            queryField = 'cashfreeOrderId';
-            orderQuery = await db.collection('orders').where(queryField, '==', numericalId).limit(1).get();
-        } else {
-            // Fallback to searching by the custom unique ID if the incoming ID is not a number.
-            queryField = 'uniqueCashfreeOrderId';
-            orderQuery = await db.collection('orders').where(queryField, '==', incomingId).limit(1).get();
-        }
-        
-        if (orderQuery.empty) {
-            console.error(`❌ Order not found for ${queryField}: ${incomingId}`);
-            return res.status(404).json({
+        // This check is the primary success/failure indicator for Razorpay redirect
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            // This happens on payment failure/cancellation
+            console.error('Missing required verification parameters. Assuming payment failed/cancelled.');
+            // We can optionally use the order_id (your internal ID) to mark as failed
+            const appOrderId = req.query.order_id;
+            if (appOrderId) {
+                try {
+                    const db = getFirestore();
+                    const orderRef = db.collection('orders').doc(appOrderId);
+                    await orderRef.update({
+                        paymentStatus: 'failed',
+                        orderStatus: 'cancelled',
+                        cancellationReason: 'Payment not completed during redirection.',
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                } catch (e) {
+                    console.error('Failed to mark order as cancelled on redirect failure:', e);
+                }
+            }
+            
+            return res.status(400).json({
                 success: false,
-                message: 'Order not found for verification.'
+                message: 'Payment was not completed or failed verification.',
+                orderId: appOrderId || null
             });
         }
-        
-        const orderDoc = orderQuery.docs[0];
-        const orderRef = orderDoc.ref;
-        const appOrderId = orderDoc.id;
-        const uniqueCashfreeOrderId = orderDoc.data().uniqueCashfreeOrderId;
-        
-        console.log(`   ✅ Found local order ${appOrderId}. Verifying with Cashfree using unique ID: ${uniqueCashfreeOrderId}`);
-        
-        // Pass the correct unique ID to the Cashfree service for the API call.
-        const paymentStatus = await CashfreeService.verifyPaymentStatus(uniqueCashfreeOrderId);
-        
-        if (paymentStatus === 'SUCCESS') {
-            console.log(`✅ Payment for order ${appOrderId} confirmed as SUCCESS.`);
+
+        try {
+            // --- 1. Verify Payment Signature ---
+            // ➡️ CHANGE: Use RazorpayService to verify the signature
+            const isSignatureValid = RazorpayService.verifyPaymentSignature(
+                razorpay_order_id,
+                razorpay_payment_id,
+                razorpay_signature
+            );
+
+            if (!isSignatureValid) {
+                console.log(`❌ Signature mismatch for Razorpay order ${razorpay_order_id}.`);
+                return res.status(400).json({
+                    success: false,
+                    message: 'Payment verification failed: Invalid signature.'
+                });
+            }
+            
+            console.log('✅ Signature verified successfully.');
+            
+            // --- 2. Find and Update Local Order ---
+            const db = getFirestore();
+            
+            // Find your local order document using the Razorpay Order ID
+            const orderQuery = await db.collection('orders').where('razorpayOrderId', '==', razorpay_order_id).limit(1).get();
+            
+            if (orderQuery.empty) {
+                console.error(`❌ Local order not found for Razorpay Order ID: ${razorpay_order_id}`);
+                return res.status(404).json({
+                    success: false,
+                    message: 'Order not found for verification in local DB.'
+                });
+            }
+            
+            const orderDoc = orderQuery.docs[0];
+            const orderRef = orderDoc.ref;
+            const appOrderId = orderDoc.id;
+            
+            // Update the local order status
             await orderRef.update({
                 paymentStatus: 'paid',
                 orderStatus: 'confirmed',
+                paymentId: razorpay_payment_id, // Store the Razorpay Payment ID
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+            
+            console.log(`✅ Payment for local order ${appOrderId} confirmed and status updated.`);
+            
             return res.status(200).json({
                 success: true,
-                message: 'Payment successful.',
+                message: 'Payment successful and verified.',
                 orderId: appOrderId
             });
-        } else {
-            console.log(`❌ Payment for order ${appOrderId} FAILED or was CANCELLED. Status: ${paymentStatus}`);
-            await orderRef.update({
-                paymentStatus: 'failed',
-                orderStatus: 'cancelled',
-                cancellationReason: `Payment failed or was cancelled. Status: ${paymentStatus}`,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            return res.status(400).json({
+
+        } catch (error) {
+            console.error('❌ Error verifying Razorpay payment:', error);
+            return res.status(500).json({
                 success: false,
-                message: `Payment failed or was cancelled. Status: ${paymentStatus}`,
-                orderId: appOrderId
+                message: 'Internal Server Error: Failed to verify payment status.'
             });
         }
-
-    } catch (error) {
-        console.error('❌ Error verifying payment and updating order:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal Server Error: Failed to verify payment status.'
-        });
     }
-}
 }
 
 module.exports = new OrderController();
