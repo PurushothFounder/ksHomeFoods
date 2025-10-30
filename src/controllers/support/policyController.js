@@ -180,5 +180,40 @@ exports.getTermsAndConditions = (req, res) => {
             }
         ]
     };
+
+
+    exports.getAccountDeletionPolicy = (req, res) => {
+    const deletionContent = {
+        title: "Account Deletion Instructions",
+        lastUpdated: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        sections: [
+            {
+                title: "How to Delete Your KS Home Foods Account",
+                content: 
+                    "We respect your right to privacy and offer a simple way to permanently delete your account and all associated data directly within the app.\n\n" +
+                    "**What happens when you delete your account?**\n" +
+                    "• Your user profile, name, email (linked to Google), phone number, and saved addresses will be permanently removed from our database.\n" +
+                    "• Your account will be removed from the Firebase Authentication system, meaning you will register as a brand new user if you sign in again.\n" +
+                    "• Your order history and all related personal data will be deleted.\n\n" +
+                    "**To proceed with account deletion, please follow these steps:**\n" +
+                    "<ol>" +
+                    "<li>Open the **KS Home Foods** App on your mobile device.</li>" +
+                    "<li>Navigate to the **Profile** screen (usually the last tab).</li>" +
+                    "<li>Scroll down to the **Account Management** section.</li>" +
+                    "<li>Tap on the **Delete Account** option.</li>" +
+                    "<li>A confirmation dialog will appear. Read the warning carefully.</li>" +
+                    "<li>If you are certain, tap **'Delete Permanently'** to finalize the process.</li>" +
+                    "</ol>\n\n" +
+                    "Once completed, you will be logged out and your account will be deleted from our system."
+            },
+            {
+                title: "Need Assistance?",
+                content: "If you encounter any issues with the in-app deletion process, please contact us by raising a **Support Ticket** within the app before your next attempt, or email our support team directly."
+            }
+        ]
+    };// Set content type to HTML and send the rendered content
+    res.set('Content-Type', 'text/html');
+    res.send(convertToHtml(deletionContent));
+};
     res.send(convertToHtml(termsContent));
 };

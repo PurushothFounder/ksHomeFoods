@@ -154,6 +154,32 @@ class AuthService {
       throw new Error(`Failed to update profile: ${error.message}`);
     }
   }
+
+  async deleteUserAccount(uid) { // 👈 NEW METHOD
+    try {
+      console.log(`🔍 Starting account deletion for uid: ${uid}`);
+
+      // 1. Delete user from local database
+      // **ASSUMPTION:** UserModel has a method like deleteUserByUid(uid)
+      console.log('📝 Deleting user from local database...');
+      await UserModel.deleteUserByUid(uid); 
+      console.log('✅ User deleted from local database');
+
+      // 2. Delete user from Firebase Auth
+      // This step ensures the user cannot sign in with Google or the same credentials again
+      const auth = this.getAuth();
+      console.log('📝 Deleting user from Firebase Auth...');
+      await auth.deleteUser(uid);
+      console.log('✅ User deleted from Firebase Auth');
+
+      return { success: true };
+    } catch (error) {
+      console.error(`❌ Account deletion failed for uid ${uid}:`, error);
+      // Re-throw a generic error to the controller
+      throw new Error(`Failed to delete account: ${error.message}`);
+    }
+  }
+  
 }
 
 module.exports = new AuthService();

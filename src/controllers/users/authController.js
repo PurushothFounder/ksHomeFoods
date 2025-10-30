@@ -91,6 +91,29 @@ class AuthController {
     }
   }
 
+  async deleteAccount(req, res) { // 👈 NEW METHOD
+    try {
+      const { uid } = req.user; // Get uid from the authenticated user
+
+      await AuthService.deleteUserAccount(uid); // Call service to delete
+
+      // Successful deletion
+      return res.status(200).json({
+        success: true,
+        message: 'Account and all associated data deleted successfully',
+        data: null
+      });
+    } catch (error) {
+      console.error('Delete account error:', error);
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        error: error.message,
+        data: null
+      });
+    }
+  }
+
   // Simple logout - just return success (client handles token removal)
   async logout(req, res) {
     try {

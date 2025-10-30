@@ -9,6 +9,7 @@ router.post('/users/google-signin', AuthController.googleSignIn);
 // Protected routes - Only when user needs to access/modify their data
 router.get('/users/profile', authenticateToken, AuthController.getProfile);
 router.put('/users/profile', authenticateToken, AuthController.updateProfile);
+router.delete('/users/profile', authenticateToken, AuthController.deleteAccount); // 👈 NEW: Account Deletion Route
 router.post('/users/logout', authenticateToken, AuthController.logout);
 
 // Optional: Add a public route to check if service is working
