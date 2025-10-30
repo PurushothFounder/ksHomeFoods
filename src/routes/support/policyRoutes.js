@@ -8,6 +8,7 @@ router.get('/privacy-policy', policyController.getPrivacyPolicy);
 // Public route to get the terms and conditions
 router.get('/terms-and-conditions', policyController.getTermsAndConditions);
 
+// Public route for account deletion instructions
 router.get('/account-deletion', policyController.getAccountDeletionPolicy);
 
 module.exports = router;

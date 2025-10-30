@@ -62,6 +62,15 @@ const convertToHtml = (content) => {
             a:hover {
                 text-decoration: underline;
             }
+            .steps ol { 
+                padding-left: 25px;
+            }
+            .steps ol li {
+                margin-bottom: 15px;
+            }
+            .steps strong {
+                color: #ff6f61;
+            }
         </style>
     </head>
     <body>
@@ -70,7 +79,9 @@ const convertToHtml = (content) => {
             <p class="last-updated">Last updated: ${content.lastUpdated}</p>
             ${content.sections.map(section => `
                 <h2>${section.title}</h2>
-                <p>${section.content.replace(/\n/g, '<br>')}</p>
+                <div class="steps">
+                    <p>${section.content.replace(/\n/g, '<br>')}</p>
+                </div>
             `).join('')}
         </div>
     </body>
@@ -90,28 +101,28 @@ exports.getPrivacyPolicy = (req, res) => {
             {
                 title: "Information We Collect",
                 content: "We may collect personal information that you voluntarily provide to us when you register on the App, place an order, or use the support ticket system. The types of information we may collect include:\n" +
-                         "•  **Personal Identification Information:** Name, email address, phone number.\n" +
-                         "•  **Address and Location Information:** Delivery address, precise location data (with your consent) for food delivery services.\n" +
-                         "•  **Order Information:** Details of your food and shopping orders, order history.\n" +
-                         "•  **Payment Information:** While we currently offer Cash on Delivery (COD), we may collect payment information (e.g., credit/debit card details) in the future to process transactions through a secure third-party payment gateway. We do not store this sensitive payment data on our servers.\n" +
-                         "•  **Support Information:** Details related to any support tickets you raise, including the nature of the issue and communication history."
+                            "•  **Personal Identification Information:** Name, email address, phone number.\n" +
+                            "•  **Address and Location Information:** Delivery address, precise location data (with your consent) for food delivery services.\n" +
+                            "•  **Order Information:** Details of your food and shopping orders, order history.\n" +
+                            "•  **Payment Information:** While we currently offer Cash on Delivery (COD), we may collect payment information (e.g., credit/debit card details) in the future to process transactions through a secure third-party payment gateway. We do not store this sensitive payment data on our servers.\n" +
+                            "•  **Support Information:** Details related to any support tickets you raise, including the nature of the issue and communication history."
             },
             {
                 title: "How We Use Your Information",
                 content: "We use the information we collect to:\n" +
-                         "•  Process and fulfill your food and shopping orders.\n" +
-                         "•  Deliver your food and shopping items to the correct address.\n" +
-                         "•  Provide customer support, including responding to your support tickets.\n" +
-                         "•  Improve our services and enhance your user experience.\n" +
-                         "•  Communicate with you about your orders, special offers, and app updates.\n" +
-                         "•  Monitor and analyze usage and trends to improve our App's functionality."
+                            "•  Process and fulfill your food and shopping orders.\n" +
+                            "•  Deliver your food and shopping items to the correct address.\n" +
+                            "•  Provide customer support, including responding to your support tickets.\n" +
+                            "•  Improve our services and enhance your user experience.\n" +
+                            "•  Communicate with you about your orders, special offers, and app updates.\n" +
+                            "•  Monitor and analyze usage and trends to improve our App's functionality."
             },
             {
                 title: "Disclosure of Your Information",
                 content: "We may share your information with third parties only in the following situations:\n" +
-                         "•  **Service Providers:** We may share your information with third-party vendors, such as delivery partners, to perform services on our behalf. These partners are required to use your information only as necessary to provide these services.\n" +
-                         "•  **Payment Processors:** When we introduce a payment gateway, your payment information will be securely handled by third-party payment processors.\n" +
-                         "•  **Legal Obligations:** We may disclose your information if required to do so by law or in response to a valid request from government authorities."
+                            "•  **Service Providers:** We may share your information with third-party vendors, such as delivery partners, to perform services on our behalf. These partners are required to use your information only as necessary to provide these services.\n" +
+                            "•  **Payment Processors:** When we introduce a payment gateway, your payment information will be securely handled by third-party payment processors.\n" +
+                            "•  **Legal Obligations:** We may disclose your information if required to do so by law or in response to a valid request from government authorities."
             },
             {
                 title: "Data Security",
@@ -146,13 +157,13 @@ exports.getTermsAndConditions = (req, res) => {
             {
                 title: "Services Offered",
                 content: "Our App provides two primary services:\n" +
-                         "•  **Food Delivery:** We offer freshly prepared homemade food for delivery to specified nearby areas.\n" +
-                         "•  **Shopping:** We provide a curated selection of shopping items for delivery across India."
+                            "•  **Food Delivery:** We offer freshly prepared homemade food for delivery to specified nearby areas.\n" +
+                            "•  **Shopping:** We provide a curated selection of shopping items for delivery across India."
             },
             {
                 title: "Order and Delivery",
-                content: "•  **Food Delivery:** Food orders are delivered only within the delivery areas specified in the App. Delivery times can vary but are typically within 3 to 5 hours from order confirmation.\n" +
-                         "•  **Shopping:** Shopping orders are delivered all over India. Delivery times can range from 3 hours up to 7 days, depending on the product, its availability, and your location."
+                content: "•  **Food Delivery:** Food orders are delivered only within the delivery areas specified in the App. Delivery times can vary but are typically within 3 to 5 hours from order confirmation.\n" +
+                            "•  **Shopping:** Shopping orders are delivered all over India. Delivery times can range from 3 hours up to 7 days, depending on the product, its availability, and your location."
             },
             {
                 title: "Payment",
@@ -180,9 +191,10 @@ exports.getTermsAndConditions = (req, res) => {
             }
         ]
     };
+    res.send(convertToHtml(termsContent));
+};
 
-
-    exports.getAccountDeletionPolicy = (req, res) => {
+exports.getAccountDeletionPolicy = (req, res) => {
     const deletionContent = {
         title: "Account Deletion Instructions",
         lastUpdated: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -211,9 +223,8 @@ exports.getTermsAndConditions = (req, res) => {
                 content: "If you encounter any issues with the in-app deletion process, please contact us by raising a **Support Ticket** within the app before your next attempt, or email our support team directly."
             }
         ]
-    };// Set content type to HTML and send the rendered content
+    };
+    // Set content type to HTML and send the rendered content
     res.set('Content-Type', 'text/html');
     res.send(convertToHtml(deletionContent));
-};
-    res.send(convertToHtml(termsContent));
 };
